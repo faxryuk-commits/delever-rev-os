@@ -696,14 +696,3 @@ ALTER TABLE "Payout" ADD CONSTRAINT "Payout_sales_rep_id_fkey" FOREIGN KEY ("sal
 
 -- AddForeignKey
 ALTER TABLE "Payout" ADD CONSTRAINT "Payout_currency_id_fkey" FOREIGN KEY ("currency_id") REFERENCES "Currency"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
-┌─────────────────────────────────────────────────────────┐
-│  Update available 5.22.0 -> 7.4.0                       │
-│                                                         │
-│  This is a major update - please follow the guide at    │
-│  https://pris.ly/d/major-version-upgrade                │
-│                                                         │
-│  Run the following to update                            │
-│    npm i --save-dev prisma@latest                       │
-│    npm i @prisma/client@latest                          │
-└─────────────────────────────────────────────────────────┘
