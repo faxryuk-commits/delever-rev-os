@@ -1,0 +1,540 @@
+// Delever Revenue OS - Database Schema
+// Convention: snake_case, singular table names, id UUID
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Auth & Governance (audit fix) ----
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  passwordHash String @map("password_hash")
+  name       String?
+  roleId     String   @map("role_id")
+  territoryId String? @map("territory_id")
+  partnerId  String?  @map("partner_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  role      Role      @relation(fields: [roleId], references: [id])
+  territory Territory? @relation(fields: [territoryId], references: [id])
+  partner   Partner?  @relation(fields: [partnerId], references: [id])
+  salesRep  SalesRep?
+  auditLogs AuditLog[]
+  tasksCreated Task[] @relation("TaskCreatedBy")
+}
+
+model Role {
+  id   String @id @default(uuid())
+  code String @unique
+  name String
+  users User[]
+}
+
+model IdempotencyKey {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  result    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  userId     String   @map("user_id")
+  action     String
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  at         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// ---- Core / Settings ----
+model Currency {
+  id     String  @id @default(uuid())
+  code   String  @unique
+  name   String
+  symbol String?
+  territories Territory[]
+  deals  Deal[]
+  contracts Contract[]
+  invoices Invoice[]
+  payments Payment[]
+  commissionAccruals CommissionAccrual[]
+  payouts Payout[]
+  priceLists PriceList[]
+}
+
+model Territory {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  timezone  String?
+  currencyId String  @map("currency_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  currency   Currency   @relation(fields: [currencyId], references: [id])
+  companies  Company[]
+  leads      Lead[]
+  contracts  Contract[]
+  partners   Partner[]
+  salesReps  SalesRep[]
+  priceLists PriceList[]
+  users      User[]
+  commissionRules CommissionRule[]
+}
+
+model Source {
+  id      String @id @default(uuid())
+  code    String @unique
+  name    String
+  channel String?
+  campaigns Campaign[]
+  leads   Lead[]
+}
+
+model Campaign {
+  id        String    @id @default(uuid())
+  sourceId  String    @map("source_id")
+  name      String
+  cost      Decimal?  @db.Decimal(14, 2)
+  startedAt DateTime? @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  source Source @relation(fields: [sourceId], references: [id])
+  leads  Lead[]
+}
+
+model Partner {
+  id            String   @id @default(uuid())
+  name          String
+  territoryId   String   @map("territory_id")
+  commissionPct Decimal? @map("commission_pct") @db.Decimal(5, 2)
+  type          String?
+
+  territory Territory @relation(fields: [territoryId], references: [id])
+  leads     Lead[]
+  users     User[]
+}
+
+model Product {
+  id        String @id @default(uuid())
+  name      String
+  sku       String?
+  type      String  // one_time | subscription
+  subscriptions Subscription[]
+  priceListItems PriceListItem[]
+}
+
+model PriceList {
+  id          String   @id @default(uuid())
+  territoryId String   @map("territory_id")
+  currencyId  String   @map("currency_id")
+  validFrom   DateTime @map("valid_from")
+  validTo     DateTime? @map("valid_to")
+
+  territory Territory @relation(fields: [territoryId], references: [id])
+  currency  Currency  @relation(fields: [currencyId], references: [id])
+  items     PriceListItem[]
+  contracts Contract[]
+}
+
+model PriceListItem {
+  id          String  @id @default(uuid())
+  priceListId String @map("price_list_id")
+  productId   String @map("product_id")
+  amount      Decimal @db.Decimal(14, 2)
+  billingCycle String? @map("billing_cycle")
+
+  priceList PriceList @relation(fields: [priceListId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Pipeline {
+  id   String @id @default(uuid())
+  code String @unique  // new_business | partner | expansion | enterprise
+  name String
+  stages PipelineStage[]
+  deals Deal[]
+}
+
+model PipelineStage {
+  id            String   @id @default(uuid())
+  pipelineId    String   @map("pipeline_id")
+  name          String
+  sortOrder     Int      @map("sort_order")
+  probabilityPct Decimal? @map("probability_pct") @db.Decimal(5, 2)
+  slaHours      Int?     @map("sla_hours")
+  isWon         Boolean  @default(false) @map("is_won")
+  isLost        Boolean  @default(false) @map("is_lost")
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+}
+
+model SalesRep {
+  id           String  @id @default(uuid())
+  userId       String  @unique @map("user_id")
+  territoryId  String? @map("territory_id")
+  name         String
+  email        String
+
+  user       User     @relation(fields: [userId], references: [id])
+  territory  Territory? @relation(fields: [territoryId], references: [id])
+  leads      Lead[]
+  deals      Deal[]
+  activities SalesActivity[]
+  tasks      Task[]
+  commissionAccruals CommissionAccrual[]
+  payouts    Payout[]
+}
+
+model CommissionPlan {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   // deal_pct | mrr_pct | tier
+  validFrom DateTime @map("valid_from")
+  validTo   DateTime? @map("valid_to")
+  rules     CommissionRule[]
+  accruals  CommissionAccrual[]
+}
+
+model CommissionRule {
+  id              String  @id @default(uuid())
+  commissionPlanId String @map("commission_plan_id")
+  territoryId     String? @map("territory_id")
+  tierMin         Decimal? @map("tier_min") @db.Decimal(14, 2)
+  tierMax         Decimal? @map("tier_max") @db.Decimal(14, 2)
+  ratePct         Decimal @map("rate_pct") @db.Decimal(5, 2)
+  ruleType        String? @map("rule_type")
+
+  commissionPlan CommissionPlan @relation(fields: [commissionPlanId], references: [id], onDelete: Cascade)
+  territory      Territory?     @relation(fields: [territoryId], references: [id])
+}
+
+// ---- Leads & Contacts ----
+model Company {
+  id           String   @id @default(uuid())
+  name         String
+  territoryId  String?  @map("territory_id")
+  domain       String?
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  territory   Territory?  @relation(fields: [territoryId], references: [id])
+  contacts    Contact[]
+  leads       Lead[]
+  deals       Deal[]
+  contracts   Contract[]
+  onboarding  Onboarding[]
+  healthScores HealthScore[]
+  activationMilestones ActivationMilestone[]
+}
+
+model Contact {
+  id        String  @id @default(uuid())
+  companyId String? @map("company_id")
+  name      String
+  email     String?
+  phone     String?
+  position  String?
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  leads     Lead[]
+  deals     Deal[]
+  activities SalesActivity[]
+}
+
+model Lead {
+  id                  String    @id @default(uuid())
+  companyId           String?   @map("company_id")
+  contactId           String?   @map("contact_id")
+  sourceId            String?   @map("source_id")
+  campaignId          String?   @map("campaign_id")
+  territoryId         String?   @map("territory_id")
+  partnerId           String?   @map("partner_id")
+  channel             String?
+  cost                Decimal?  @db.Decimal(14, 2)
+  referralTrackingId  String?   @map("referral_tracking_id")
+  status              String    @default("new")  // new | contacted | qualified | converted | lost
+  score               Decimal?  @db.Decimal(5, 2)
+  assignedToId        String?   @map("assigned_to_id")
+  deletedAt           DateTime? @map("deleted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  company    Company?   @relation(fields: [companyId], references: [id])
+  contact    Contact?   @relation(fields: [contactId], references: [id])
+  source     Source?    @relation(fields: [sourceId], references: [id])
+  campaign   Campaign?  @relation(fields: [campaignId], references: [id])
+  territory  Territory? @relation(fields: [territoryId], references: [id])
+  partner    Partner?   @relation(fields: [partnerId], references: [id])
+  assignedTo SalesRep?  @relation(fields: [assignedToId], references: [id])
+  deals      Deal[]
+  activities SalesActivity[]
+  tasks      Task[]
+}
+
+// ---- Deals ----
+model Deal {
+  id                String    @id @default(uuid())
+  pipelineId        String    @map("pipeline_id")
+  pipelineStageId   String    @map("pipeline_stage_id")
+  companyId         String    @map("company_id")
+  contactId         String?   @map("contact_id")
+  leadId            String?   @map("lead_id")
+  salesRepId        String?   @map("sales_rep_id")
+  amount            Decimal?  @db.Decimal(14, 2)
+  currencyId        String?   @map("currency_id")
+  expectedCloseAt   DateTime? @map("expected_close_at")
+  closedAt          DateTime? @map("closed_at")
+  outcome           String    @default("open")  // open | won | lost
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  pipeline      Pipeline      @relation(fields: [pipelineId], references: [id])
+  pipelineStage PipelineStage @relation(fields: [pipelineStageId], references: [id])
+  company       Company       @relation(fields: [companyId], references: [id])
+  contact       Contact?      @relation(fields: [contactId], references: [id])
+  lead          Lead?         @relation(fields: [leadId], references: [id])
+  salesRep      SalesRep?     @relation(fields: [salesRepId], references: [id])
+  currency      Currency?     @relation(fields: [currencyId], references: [id])
+  contracts     Contract[]
+  activities    SalesActivity[]
+  tasks         Task[]
+  commissionAccruals CommissionAccrual[]
+
+  @@index([pipelineId, pipelineStageId])
+  @@index([salesRepId])
+  @@index([companyId])
+}
+
+// ---- Contracts & Revenue ----
+model Contract {
+  id            String    @id @default(uuid())
+  dealId        String?   @map("deal_id")
+  companyId     String    @map("company_id")
+  territoryId   String    @map("territory_id")
+  currencyId    String    @map("currency_id")
+  priceListId   String?   @map("price_list_id")
+  startDate     DateTime  @map("start_date")
+  endDate       DateTime  @map("end_date")
+  lengthMonths  Int?      @map("length_months")
+  status        String    @default("active")  // draft | active | expired | cancelled
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  deal         Deal?         @relation(fields: [dealId], references: [id])
+  company      Company       @relation(fields: [companyId], references: [id])
+  territory    Territory     @relation(fields: [territoryId], references: [id])
+  currency     Currency      @relation(fields: [currencyId], references: [id])
+  priceList    PriceList?    @relation(fields: [priceListId], references: [id])
+  subscriptions Subscription[]
+  invoices     Invoice[]
+  onboarding   Onboarding[]
+}
+
+model Subscription {
+  id           String    @id @default(uuid())
+  contractId   String    @map("contract_id")
+  productId    String    @map("product_id")
+  mrr          Decimal   @db.Decimal(14, 2)
+  arr          Decimal   @db.Decimal(14, 2)
+  billingCycle String    @map("billing_cycle")  // monthly | yearly
+  renewalDate DateTime  @map("renewal_date")
+  status       String    @default("active")  // active | past_due | cancelled
+  churnRisk    String?   @map("churn_risk")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+  invoices Invoice[]
+  tasks    Task[]
+  healthScores HealthScore[]
+  commissionAccruals CommissionAccrual[]
+
+  @@index([status, renewalDate])
+}
+
+model Invoice {
+  id             String    @id @default(uuid())
+  subscriptionId String?   @map("subscription_id")
+  contractId     String?   @map("contract_id")
+  amount         Decimal   @db.Decimal(14, 2)
+  currencyId     String    @map("currency_id")
+  status         String    @default("draft")  // draft | sent | paid | overdue
+  dueDate        DateTime? @map("due_date")
+  paidAt         DateTime? @map("paid_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  contract     Contract?     @relation(fields: [contractId], references: [id])
+  currency     Currency      @relation(fields: [currencyId], references: [id])
+  payments     Payment[]
+}
+
+model Payment {
+  id         String   @id @default(uuid())
+  invoiceId  String   @map("invoice_id")
+  amount     Decimal  @db.Decimal(14, 2)
+  currencyId String   @map("currency_id")
+  paidAt     DateTime @map("paid_at")
+  method     String?
+  gatewayFee Decimal? @map("gateway_fee") @db.Decimal(14, 2)
+
+  invoice  Invoice  @relation(fields: [invoiceId], references: [id])
+  currency Currency @relation(fields: [currencyId], references: [id])
+}
+
+// ---- Activities & Tasks ----
+model SalesActivity {
+  id          String   @id @default(uuid())
+  dealId      String?  @map("deal_id")
+  leadId      String?  @map("lead_id")
+  contactId   String?  @map("contact_id")
+  salesRepId  String   @map("sales_rep_id")
+  type        String   // call | meeting | email
+  subject     String?
+  occurredAt  DateTime @map("occurred_at")
+  metadata    Json?
+  durationSec Int?     @map("duration_sec")
+
+  deal    Deal?    @relation(fields: [dealId], references: [id])
+  lead    Lead?    @relation(fields: [leadId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  salesRep SalesRep @relation(fields: [salesRepId], references: [id])
+}
+
+model Task {
+  id            String    @id @default(uuid())
+  dealId        String?   @map("deal_id")
+  leadId        String?   @map("lead_id")
+  subscriptionId String?  @map("subscription_id")
+  assignedToId  String    @map("assigned_to_id")
+  createdById  String?   @map("created_by_id")
+  title         String
+  dueAt         DateTime? @map("due_at")
+  status        String    @default("pending")  // pending | done | cancelled
+  priority      String?   @default("medium")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  deal         Deal?         @relation(fields: [dealId], references: [id])
+  lead         Lead?         @relation(fields: [leadId], references: [id])
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  assignedTo   SalesRep      @relation(fields: [assignedToId], references: [id])
+  createdBy    User?         @relation("TaskCreatedBy", fields: [createdById], references: [id])
+}
+
+// ---- Customer Success ----
+model Onboarding {
+  id         String   @id @default(uuid())
+  companyId  String   @map("company_id")
+  contractId String   @map("contract_id")
+  status     String   @default("not_started")  // not_started | in_progress | completed
+  steps      Json?    // [{ step_key, status, completed_at }]
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  contract Contract @relation(fields: [contractId], references: [id])
+}
+
+model ActivationMilestone {
+  id           String   @id @default(uuid())
+  companyId    String   @map("company_id")
+  milestoneKey String   @map("milestone_key")
+  reachedAt    DateTime @map("reached_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+}
+
+model HealthScore {
+  id             String   @id @default(uuid())
+  companyId      String?  @map("company_id")
+  subscriptionId String?  @map("subscription_id")
+  score          Int      // 0-100
+  usageScore     Int?     @map("usage_score")
+  supportScore   Int?     @map("support_score")
+  paymentScore   Int?     @map("payment_score")
+  calculatedAt   DateTime @map("calculated_at")
+
+  company      Company?      @relation(fields: [companyId], references: [id])
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+}
+
+model Workflow {
+  id             String   @id @default(uuid())
+  name           String
+  triggerEntity  String   @map("trigger_entity")
+  triggerEvent   String   @map("trigger_event")
+  conditions     Json?
+  actions        Json?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+}
+
+// ---- Commissions ----
+model CommissionAccrual {
+  id                String   @id @default(uuid())
+  salesRepId        String   @map("sales_rep_id")
+  commissionPlanId  String   @map("commission_plan_id")
+  dealId            String?  @map("deal_id")
+  subscriptionId     String?  @map("subscription_id")
+  amount            Decimal  @db.Decimal(14, 2)
+  currencyId        String   @map("currency_id")
+  periodStart       DateTime @map("period_start")
+  periodEnd         DateTime @map("period_end")
+  status            String   @default("pending")  // pending | approved | paid
+  accrualType       String?   @map("accrual_type")  // deal | mrr | partner
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  salesRep        SalesRep        @relation(fields: [salesRepId], references: [id])
+  commissionPlan  CommissionPlan  @relation(fields: [commissionPlanId], references: [id])
+  deal            Deal?           @relation(fields: [dealId], references: [id])
+  subscription    Subscription?   @relation(fields: [subscriptionId], references: [id])
+  currency        Currency        @relation(fields: [currencyId], references: [id])
+}
+
+model Payout {
+  id         String   @id @default(uuid())
+  salesRepId String   @map("sales_rep_id")
+  amount     Decimal  @db.Decimal(14, 2)
+  currencyId String   @map("currency_id")
+  paidAt     DateTime @map("paid_at")
+  status     String   @default("completed")
+
+  salesRep SalesRep @relation(fields: [salesRepId], references: [id])
+  currency Currency @relation(fields: [currencyId], references: [id])
+}
+
+// ---- Analytics (read-model snapshots) ----
+model MetricSnapshot {
+  id          String   @id @default(uuid())
+  metricKey   String   @map("metric_key")
+  dimensions  Json?
+  value       Decimal  @db.Decimal(20, 4)
+  periodType  String   @map("period_type")  // day | week | month
+  periodAt    DateTime @map("period_at")
+}
+
+model PipelineSnapshot {
+  id             String   @id @default(uuid())
+  pipelineId     String   @map("pipeline_id")
+  stageId        String   @map("stage_id")
+  dealCount      Int      @map("deal_count")
+  weightedValue  Decimal  @map("weighted_value") @db.Decimal(14, 2)
+  snapshotAt     DateTime @map("snapshot_at")
+}
