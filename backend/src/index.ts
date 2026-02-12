@@ -97,4 +97,4 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const PORT = Number(process.env.PORT) || 3001;
-app.listen(PORT, () => console.log(`Delever Revenue OS API listening on ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Delever Revenue OS API listening on 0.0.0.0:${PORT}`));
