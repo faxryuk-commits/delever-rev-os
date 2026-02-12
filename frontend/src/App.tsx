@@ -12,6 +12,14 @@ import CompanyList from './pages/CompanyList';
 import CompanyCard from './pages/CompanyCard';
 import ContactCard from './pages/ContactCard';
 import TaskList from './pages/TaskList';
+import ContractList from './pages/ContractList';
+import ContractCard from './pages/ContractCard';
+import SubscriptionList from './pages/SubscriptionList';
+import SubscriptionCard from './pages/SubscriptionCard';
+import InvoiceList from './pages/InvoiceList';
+import InvoiceCard from './pages/InvoiceCard';
+import Analytics from './pages/Analytics';
+import Commissions from './pages/Commissions';
 import Settings from './pages/Settings';
 
 export default function App() {
@@ -34,6 +42,7 @@ export default function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        {/* CRM core */}
         <Route path="/leads" element={<LeadList />} />
         <Route path="/leads/new" element={<LeadNew />} />
         <Route path="/leads/:id" element={<LeadCard />} />
@@ -43,6 +52,17 @@ export default function App() {
         <Route path="/companies/:id" element={<CompanyCard />} />
         <Route path="/contacts/:id" element={<ContactCard />} />
         <Route path="/tasks" element={<TaskList />} />
+        {/* Revenue & Billing */}
+        <Route path="/contracts" element={<ContractList />} />
+        <Route path="/contracts/:id" element={<ContractCard />} />
+        <Route path="/subscriptions" element={<SubscriptionList />} />
+        <Route path="/subscriptions/:id" element={<SubscriptionCard />} />
+        <Route path="/invoices" element={<InvoiceList />} />
+        <Route path="/invoices/:id" element={<InvoiceCard />} />
+        {/* Analytics & Commissions */}
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/commissions" element={<Commissions />} />
+        {/* Settings */}
         <Route path="/settings/*" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

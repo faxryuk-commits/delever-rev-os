@@ -62,11 +62,37 @@ export interface ContractCreatedEvent extends BaseEvent {
   companyId: string;
 }
 
+export interface InvoiceIssuedEvent extends BaseEvent {
+  type: 'InvoiceIssued';
+  invoiceId: string;
+  amount: number;
+}
+
 export interface PaymentReceivedEvent extends BaseEvent {
   type: 'PaymentReceived';
   paymentId: string;
   invoiceId: string;
   amount: number;
+}
+
+export interface SubscriptionActivatedEvent extends BaseEvent {
+  type: 'SubscriptionActivated';
+  subscriptionId: string;
+  contractId: string;
+  mrr: number;
+}
+
+export interface SubscriptionCancelledEvent extends BaseEvent {
+  type: 'SubscriptionCancelled';
+  subscriptionId: string;
+  mrr: number;
+}
+
+export interface TaskCreatedEvent extends BaseEvent {
+  type: 'TaskCreated';
+  taskId: string;
+  dealId?: string;
+  leadId?: string;
 }
 
 export type DomainEvent =
@@ -76,7 +102,11 @@ export type DomainEvent =
   | DealWonEvent
   | DealLostEvent
   | ContractCreatedEvent
-  | PaymentReceivedEvent;
+  | InvoiceIssuedEvent
+  | PaymentReceivedEvent
+  | SubscriptionActivatedEvent
+  | SubscriptionCancelledEvent
+  | TaskCreatedEvent;
 
 type Listener = (event: DomainEvent) => void | Promise<void>;
 
