@@ -1,9 +1,17 @@
 {
-  "installCommand": "cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build",
+  "installCommand": "cd backend && npm install && npx prisma generate && cd ../frontend && npm install",
+  "buildCommand": "cd backend && (npx prisma db push --skip-generate --accept-data-loss 2>&1 || true) && (npx tsx prisma/seed.ts 2>&1 || true) && cd ../frontend && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": null,
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "backend/**",
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

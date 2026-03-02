@@ -20,10 +20,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  const apiBase = typeof import.meta.env.VITE_API_URL === 'string' ? import.meta.env.VITE_API_URL : '';
-
   const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch(`${apiBase}/api/v1/auth/login`, {
+    const res = await fetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -36,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const t = data.token;
     localStorage.setItem(TOKEN_KEY, t);
     setToken(t);
-  }, [apiBase]);
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
@@ -50,9 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
         headers.set('Content-Type', 'application/json');
       }
-      return fetch(`${apiBase}/api/v1${path}`, { ...options, headers });
+      return fetch(`/api/v1${path}`, { ...options, headers });
     },
-    [token, apiBase]
+    [token]
   );
 
   return (
