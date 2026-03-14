@@ -46,7 +46,10 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
   const auth = res.locals.auth as AuthLocals;
   const user = await prisma.user.findUnique({
     where: { id: auth.userId },
-    include: { role: true, territory: true, salesRep: true },
+    select: {
+      id: true, email: true, name: true, createdAt: true, updatedAt: true,
+      role: true, territory: true, salesRep: true,
+    },
   });
   res.json(user);
 });

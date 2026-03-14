@@ -16,7 +16,7 @@ const listValidators = [
   query('assigned_to_id').optional().isUUID(),
   query('date_from').optional().isISO8601(),
   query('date_to').optional().isISO8601(),
-  query('sort').optional().isIn(['created_at', 'score', 'updated_at']),
+  query('sort').optional().isIn(['createdAt', 'score', 'updatedAt']),
   query('order').optional().isIn(['asc', 'desc']),
   query('limit').optional().isInt({ min: 1, max: 200 }).toInt(),
   query('offset').optional().isInt({ min: 0 }).toInt(),
@@ -41,7 +41,7 @@ router.get(
     if (req.query.assigned_to_id) where.assignedToId = req.query.assigned_to_id;
     if (req.query.date_from) where.createdAt = { ...(where.createdAt as object), gte: new Date(req.query.date_from as string) };
     if (req.query.date_to) where.createdAt = { ...(where.createdAt as object), lte: new Date(req.query.date_to as string) };
-    const sort = (req.query.sort as string) || 'created_at';
+    const sort = (req.query.sort as string) || 'createdAt';
     const order = (req.query.order as string) || 'desc';
     const [items, total] = await Promise.all([
       prisma.lead.findMany({

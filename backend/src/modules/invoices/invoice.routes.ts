@@ -28,7 +28,7 @@ router.get(
     const [items, total] = await Promise.all([
       prisma.invoice.findMany({
         where,
-        include: { currency: true, subscription: true, contract: true, payments: true },
+        include: { currency: true, subscription: { include: { product: true } }, contract: { include: { company: true } }, payments: true },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
