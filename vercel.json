@@ -1,6 +1,6 @@
 {
-  "installCommand": "cd backend && npm install && npx prisma generate && cd ../frontend && npm install",
-  "buildCommand": "cd backend && tsc && (npx prisma db push --skip-generate --accept-data-loss 2>&1 || true) && (npx tsx prisma/seed.ts 2>&1 || true) && cd ../frontend && npm run build",
+  "installCommand": "cd backend && npm install --include=dev && npx prisma generate && cd ../frontend && npm install",
+  "buildCommand": "cd backend && npx tsc && (npx prisma db push --skip-generate --accept-data-loss 2>&1 || true) && (npx tsx prisma/seed.ts 2>&1 || true) && cd ../frontend && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": null,
   "functions": {
